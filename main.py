@@ -3,14 +3,18 @@ import torchvision.transforms as standard_transforms
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
+from torch.autograd import Variable
 from tqdm import tqdm
+from tensorboardX import SummaryWriter
+import torchvision.utils as vutils
 
 from metric_depth_model import MetricDepthModel
 from load_dataset import CustomerDataLoader
 from utils import load_ckpt,save_ckpt,resize_image
 from evaluate import evaluate_err
 cfg = {
-'mode': 'test',
+'mode': 'train',
 'device': 'cuda:0',
 'RESNET_BOTTLENECK_DIM':[64, 256, 512, 1024, 2048],
 'LATERAL_OUT':[512, 256, 256, 256],
@@ -46,7 +50,7 @@ test_args = {
 'batchsize':1,
 'dataset':'nyudv2',
 'dataroot':'NYUDV2',
-'load_ckpt':'pretrained_baselines/nyu_rawdata.pth',
+'load_ckpt':None,
 'start_step':0,
 'start_epoch':0,
 'save_dir':'',
@@ -55,25 +59,51 @@ test_args = {
 train_args = {
 'phase':'train',
 'phase_anno':'train',
-'batchsize':2,
-'thread':2,
+'epoch':10,
+'batchsize':4,
+'thread':8,
 'dataset':'nyudv2',
 'dataroot':'NYUDV2',
-'load_ckpt':'',
+'load_ckpt':'pretrained_baselines/nyu_rawdata.pth',
 'start_step':0,
 'start_epoch':0,
 'save_dir':'',
+'lr':1e-5,
+
 }
 
-def train(model,data_loader,cfg,train_args):
+writer = SummaryWriter(comment='code')
+
+def train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train_args,test_args):
     if train_args['load_ckpt'] is not None:
         load_ckpt(train_args,model)
-    return 0
+    model.train()
+    lr = train_args['lr']
+    for epoch in range(train_args['epoch']):
+        print('epoch #: %d'%epoch)
+        for i,data in enumerate(tqdm(data_loader_train)):
+            target = data['B'].squeeze().long().to(cfg['device'])
+            output,pred_depth = model.train_nyuv2(data)
+            loss = criterion(output,target)
+            loss.backward()
+            optimizer.zero_grad()
+            optimizer.step()
+            lr = poly_lr_scheduler(optimizer,train_args['lr'],i + epoch*len(data_loader_train))
+            print(lr)
+            if i%10 == 0:
+                Img = vutils.make_grid(data['A'].data,normalize = True,scale_each = True)
+                GT_depth = vutils.make_grid(data['B'].data,normalize = True,scale_each = True)
+                Estimated_depth = vutils.make_grid(pred_depth.data,normalize = True,scale_each = True)
+                writer.add_image('RGB',Img,i + epoch*len(data_loader_train))
+                writer.add_image('GT_Depth',GT_depth,i + epoch*len(data_loader_train))
+                writer.add_image('Predicted_Depth',Estimated_depth,i + epoch*len(data_loader_train))
 
+
+        test(model,data_loader_test,cfg,test_args)
 
 def test(model,data_loader,cfg,test_args):
-    if test_args['load_ckpt'] is not None:
-        load_ckpt(test_args,model)
+#    if test_args['load_ckpt'] is not None:
+#        load_ckpt(test_args,model)
     model.eval()
     error_total = {'err_absRel': 0.0, 'err_squaRel': 0.0, 'err_rms': 0.0,
                          'err_silog': 0.0, 'err_logRms': 0.0, 'err_silog2': 0.0,
@@ -108,6 +138,26 @@ def test(model,data_loader,cfg,test_args):
     print('logRms: %f'%error['err_logRms'])
 
     print('----------------------------------------------------------')
+    model.train()
+
+def poly_lr_scheduler(optimizer, init_lr, iter, lr_decay_iter=0.9,
+                      max_iter=14500, power=0.9):
+    """Polynomial decay of learning rate
+        :param init_lr is base learning rate
+        :param iter is a current iteration
+        :param lr_decay_iter how frequently decay occurs, default is 1
+        :param max_iter is number of maximum iterations
+        :param power is a polymomial power
+
+    """
+    if iter % lr_decay_iter or iter > max_iter:
+        return optimizer
+
+    lr = init_lr*(1 - iter/max_iter)**power
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+    return lr
 
 
 def calculate_average_error(error,n_pxl,eval_num):
@@ -134,18 +184,16 @@ def calculate_average_error(error,n_pxl,eval_num):
 def main(cfg,train_args,test_args):
     model = MetricDepthModel(cfg).to(cfg['device']) 
     if cfg['mode'] == 'train':
-        data_loader = CustomerDataLoader(cfg,train_args)
-        print(len(data_loader))
-        train(model,data_loader,cfg,train_args)
+        optimizer = optim.SGD(model.parameters(), lr=train_args['lr'], momentum=0.9, weight_decay = 0.0005)
+        criterion = nn.CrossEntropyLoss(weight=None, ignore_index = -1,reduction='elementwise_mean').to(cfg['device'])
+        data_loader_train = CustomerDataLoader(cfg,train_args)
+        data_loader_test = CustomerDataLoader(cfg,test_args)
+        train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train_args,test_args)
 
     if cfg['mode'] == 'test':
         data_loader = CustomerDataLoader(cfg,test_args)
         print(len(data_loader))
         test(model,data_loader,cfg,test_args)   
-
-
-
-
 
 
 main(cfg,train_args,test_args)

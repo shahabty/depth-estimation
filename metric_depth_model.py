@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.autograd import Variable
 import lateral_net as lateral_net
 from utils import bins_to_depth,kitti_merge_imgs
 #from lib.utils.net_tools import get_func
@@ -20,6 +21,12 @@ class MetricDepthModel(nn.Module):
         self.a_real = data['A'].cuda()
         self.b_fake_logit, self.b_fake_softmax = self.depth_model(self.a_real)
         return {'b_fake_logit': self.b_fake_logit, 'b_fake_softmax': self.b_fake_softmax}
+
+    def train_nyuv2(self,data):
+        data['A'] = data['A']
+        out = self.forward(data)
+        pred_depth = bins_to_depth(self.cfg,out['b_fake_softmax'])
+        return out['b_fake_softmax'],pred_depth 
 
     def inference(self, data):
         with torch.no_grad():

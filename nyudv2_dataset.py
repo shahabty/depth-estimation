@@ -7,7 +7,7 @@ import scipy.io as sio
 #from lib.core.config import cfg
 import torchvision.transforms as transforms
 #from lib.utils.logging import setup_logging
-
+from edge.canny import run_edge
 #logger = setup_logging(__name__)
 
 
@@ -76,14 +76,17 @@ class NYUDV2Dataset():
         # change the color channel, bgr -> rgb
         A_resize = A_resize[::-1, :, :]
 
+        edge = run_edge(A_resize)
+
         # to torch, normalize
         A_resize = self.scale_torch(A_resize, 255.)
         B_resize = self.scale_torch(B_resize, resize_ratio)
 
+        #B_resize.requires_grad = False
         B_bins = self.depth_to_bins(B_resize)
         invalid_side = [int(pad[0] * resize_ratio), 0, 0, 0]
 
-        data = {'A': A_resize, 'B': B_resize, 'A_raw': A, 'B_raw': B, 'B_bins': B_bins, 'A_paths': A_path,
+        data = {'A': A_resize, 'E':edge,'B': B_resize, 'A_raw': A, 'B_raw': B, 'B_bins': B_bins, 'A_paths': A_path,
                 'B_paths': B_path, 'invalid_side': np.array(invalid_side), 'ratio': np.float32(1.0 / resize_ratio)}
         return data
 

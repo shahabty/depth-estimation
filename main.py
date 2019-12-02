@@ -59,7 +59,7 @@ test_args = {
 train_args = {
 'phase':'train',
 'phase_anno':'train',
-'epoch':10,
+'epoch':20,
 'batchsize':4,
 'thread':8,
 'dataset':'nyudv2',
@@ -81,25 +81,30 @@ def train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train
     lr = train_args['lr']
     for epoch in range(train_args['epoch']):
         print('epoch #: %d'%epoch)
-        for i,data in enumerate(tqdm(data_loader_train)):
-            target = data['B'].squeeze().long().to(cfg['device'])
+        for i,data in tqdm(enumerate(data_loader_train)):
+            target = data['B_bins'].squeeze().long().to(cfg['device'])
             output,pred_depth = model.train_nyuv2(data)
             loss = criterion(output,target)
             loss.backward()
             optimizer.zero_grad()
             optimizer.step()
             lr = poly_lr_scheduler(optimizer,train_args['lr'],i + epoch*len(data_loader_train))
-            print(lr)
             if i%10 == 0:
-                Img = vutils.make_grid(data['A'].data,normalize = True,scale_each = True)
-                GT_depth = vutils.make_grid(data['B'].data,normalize = True,scale_each = True)
-                Estimated_depth = vutils.make_grid(pred_depth.data,normalize = True,scale_each = True)
+                Img = vutils.make_grid(data['A'].data.cpu(),normalize = True,scale_each = True)
+                GT_depth = vutils.make_grid(data['B'].data.cpu(),normalize = True,scale_each = True)
+                Estimated_depth = vutils.make_grid(pred_depth.data.cpu(),normalize = True,scale_each = True)
+                Edge = vutils.make_grid(data['E'].unsqueeze(1).repeat(1,3,1,1).data.cpu(),normalize = True,scale_each = True)
+                inputs = vutils.make_grid((data['A']*data['E'].unsqueeze(1).repeat(1,3,1,1)).data.cpu(),normalize = True,scale_each = True) #x*e.repeat(1,3,1,1)
                 writer.add_image('RGB',Img,i + epoch*len(data_loader_train))
                 writer.add_image('GT_Depth',GT_depth,i + epoch*len(data_loader_train))
                 writer.add_image('Predicted_Depth',Estimated_depth,i + epoch*len(data_loader_train))
-
+                writer.add_image('Edge',Edge,i + epoch*len(data_loader_train))
+                writer.add_image('inputs',inputs,i + epoch*len(data_loader_train))
+            del target,output,pred_depth,loss
+        print(lr)
 
         test(model,data_loader_test,cfg,test_args)
+        save_ckpt(train_args['batchsize'],save_dir = '.',step = i + epoch*len(data_loader_train),epoch = epoch,model = model,optimizer = optimizer)
 
 def test(model,data_loader,cfg,test_args):
 #    if test_args['load_ckpt'] is not None:
@@ -138,6 +143,7 @@ def test(model,data_loader,cfg,test_args):
     print('logRms: %f'%error['err_logRms'])
 
     print('----------------------------------------------------------')
+    del error,output,pred_depth,img_path,invalid_side
     model.train()
 
 def poly_lr_scheduler(optimizer, init_lr, iter, lr_decay_iter=0.9,
@@ -185,7 +191,7 @@ def main(cfg,train_args,test_args):
     model = MetricDepthModel(cfg).to(cfg['device']) 
     if cfg['mode'] == 'train':
         optimizer = optim.SGD(model.parameters(), lr=train_args['lr'], momentum=0.9, weight_decay = 0.0005)
-        criterion = nn.CrossEntropyLoss(weight=None, ignore_index = -1,reduction='elementwise_mean').to(cfg['device'])
+        criterion = nn.CrossEntropyLoss(weight=None, ignore_index = 151,reduction='elementwise_mean').to(cfg['device'])
         data_loader_train = CustomerDataLoader(cfg,train_args)
         data_loader_test = CustomerDataLoader(cfg,test_args)
         train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train_args,test_args)

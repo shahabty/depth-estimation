@@ -19,7 +19,8 @@ class MetricDepthModel(nn.Module):
     def forward(self, data):
         # Input data is a_real, predicted data is b_fake, groundtruth is b_real
         self.a_real = data['A'].cuda()
-        self.b_fake_logit, self.b_fake_softmax = self.depth_model(self.a_real)
+        self.edge = data['E'].unsqueeze(1).cuda()
+        self.b_fake_logit, self.b_fake_softmax = self.depth_model(self.a_real,self.edge)
         return {'b_fake_logit': self.b_fake_logit, 'b_fake_softmax': self.b_fake_softmax}
 
     def train_nyuv2(self,data):
@@ -70,8 +71,9 @@ class DepthModel(nn.Module):
 #get_func(bottom_up_model)()
         self.decoder_modules = lateral_net.fcn_topdown(self.cfg,self.cfg['ENCODER'])
 
-    def forward(self, x):
-        lateral_out, encoder_stage_size = self.encoder_modules(x)
+    def forward(self, x,e):
+        inp = x*e.repeat(1,3,1,1)#torch.cat([x,e],dim = 1)
+        lateral_out, encoder_stage_size = self.encoder_modules(inp) #x
         out_logit, out_softmax = self.decoder_modules(lateral_out, encoder_stage_size)
         return out_logit, out_softmax
 

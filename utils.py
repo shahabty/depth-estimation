@@ -73,20 +73,20 @@ def load_ckpt(args, model, optimizer=None, scheduler=None, val_err=[]):
         del checkpoint
         torch.cuda.empty_cache()
 
-def save_ckpt(batchsize,save_dir, step, epoch, model, optimizer, scheduler, val_err={}):
+def save_ckpt(batchsize,save_dir, step, epoch, model, optimizer):#, scheduler, val_err={}):
     """Save checkpoint"""
     ckpt_dir = os.path.join(save_dir, 'ckpt')
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
     save_name = os.path.join(ckpt_dir, 'epoch%d_step%d.pth' %(epoch, step))
-    if isinstance(model, nn.DataParallel):
-        model = model.module
+    #if isinstance(model, nn.DataParallel):
+    #    model = model.module
     torch.save({
         'step': step,
         'epoch': epoch,
         'batch_size': batchsize,
-        'scheduler': scheduler.state_dict(),
-        'val_err': val_err,
+        #'scheduler': scheduler.state_dict(),
+        #'val_err': val_err,
         'model_state_dict': model.state_dict(),
         'optimizer': optimizer.state_dict()},
         save_name, pickle_module=dill)

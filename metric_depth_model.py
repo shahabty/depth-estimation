@@ -27,7 +27,7 @@ class MetricDepthModel(nn.Module):
         data['A'] = data['A']
         out = self.forward(data)
         pred_depth = bins_to_depth(self.cfg,out['b_fake_softmax'])
-        return out['b_fake_softmax'],pred_depth 
+        return out,pred_depth 
 
     def inference(self, data):
         with torch.no_grad():

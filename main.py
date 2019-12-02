@@ -68,7 +68,7 @@ train_args = {
 'start_step':0,
 'start_epoch':0,
 'save_dir':'',
-'lr':1e-5,
+'lr':1e-4,
 
 }
 
@@ -83,8 +83,16 @@ def train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train
         print('epoch #: %d'%epoch)
         for i,data in tqdm(enumerate(data_loader_train)):
             target = data['B_bins'].squeeze().long().to(cfg['device'])
+            
+
             output,pred_depth = model.train_nyuv2(data)
-            loss = criterion(output,target)
+            output_softmax = output['b_fake_softmax']
+            output_logit = output['b_fake_logit']
+
+#            weights = torch.mean(torch.exp(-1*torch.pow((pred_depth - target.float()),2)))#*output_softmax )
+            #print(pred_depth.shape)          
+            #print(weights.shape)
+            loss = criterion(output_softmax,target)
             loss.backward()
             optimizer.zero_grad()
             optimizer.step()
@@ -145,6 +153,13 @@ def test(model,data_loader,cfg,test_args):
     print('----------------------------------------------------------')
     del error,output,pred_depth,img_path,invalid_side
     model.train()
+
+#def calculate_weights(output,target,output_softmax,cfg):
+    
+#    for i in range(cfg['DECODER_OUTPUT_C']):
+#        output_logit[:,i,:,:] - 
+#    torch.mean(torch.exp(-1*torch.pow((output_logit[:,target,:,:]),2))*output_softmax )
+
 
 def poly_lr_scheduler(optimizer, init_lr, iter, lr_decay_iter=0.9,
                       max_iter=14500, power=0.9):

@@ -1,8 +1,5 @@
 import os
 import torch
-#from lib.core.config import cfg
-#import logging
-#logger = logging.getLogger(__name__)
 
 def load_pretrained_imagenet_resnext_weights(model):
     """Load pretrained weights
@@ -21,7 +18,6 @@ def load_pretrained_imagenet_resnext_weights(model):
         else:
             print('Weight %s is not in ResNeXt model.' % k)
     print('Pretrained ResNeXt weight has been loaded')
-#    logger.info('Pretrained ResNeXt weight has been loaded')
 
 
 def convert_state_dict(src_dict):

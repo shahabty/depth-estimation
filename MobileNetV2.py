@@ -1,6 +1,5 @@
 import torch.nn as nn
 import math
-#from lib.core.config import cfg
 # ---------------------------------------------------------------------------- #
 # Bits for specific architectures (ResNeXt50, ResNeXt101, ...)
 # ---------------------------------------------------------------------------- #

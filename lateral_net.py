@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-#from lib.core.config import cfg
 import ResNeXt as ResNeXt
 import resnext_weights_helper as resnext_utils
 import mobilenetv2_weight_helper as mobilenet_utils

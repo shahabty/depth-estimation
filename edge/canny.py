@@ -19,7 +19,7 @@ def canny(raw_img, use_cuda=False):
 
     blurred_img, grad_mag, grad_orientation, thin_edges, thresholded, early_threshold = net(data)
 
-    return grad_mag.data.cpu().numpy()[0,0]
+    return thin_edges.data.cpu().numpy()[0,0]
     #imsave('gradient_magnitude.png',grad_mag.data.cpu().numpy()[0,0])
     #imsave('thin_edges.png', thresholded.data.cpu().numpy()[0, 0])
     #imsave('final.png', (thresholded.data.cpu().numpy()[0, 0] > 0.0).astype(float))

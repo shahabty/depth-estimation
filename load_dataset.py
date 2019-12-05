@@ -1,7 +1,5 @@
 import torch.utils.data
 import importlib
-#from lib.utils.logging import setup_logging
-#logger = setup_logging(__name__)
 
 class CustomerDataLoader():
     def __init__(self, cfg,opt):
@@ -48,8 +46,6 @@ def find_dataset_lib(dataset_name):
         if name.lower() == target_dataset_name.lower():
             dataset = cls
     if dataset is None:
-        #logger.info("In %s.py, there should be a class name that matches %s in lowercase." % (
-        #dataset_filename, target_dataset_name))
         print("In %s.py, there should be a class name that matches %s in lowercase." % (dataset_filename, target_dataset_name))
         exit(0)
     return dataset

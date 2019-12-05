@@ -4,11 +4,8 @@ import torch
 import os.path
 import numpy as np
 import scipy.io as sio
-#from lib.core.config import cfg
 import torchvision.transforms as transforms
-#from lib.utils.logging import setup_logging
 from edge.canny import run_edge
-#logger = setup_logging(__name__)
 
 
 class NYUDV2Dataset():

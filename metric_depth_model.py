@@ -4,10 +4,6 @@ import numpy as np
 from torch.autograd import Variable
 import lateral_net as lateral_net
 from utils import bins_to_depth,kitti_merge_imgs
-#from lib.utils.net_tools import get_func
-#from lib.models.image_transfer import bins_to_depth, kitti_merge_imgs
-#from lib.core.config import cfg
-
 
 class MetricDepthModel(nn.Module):
     def __init__(self,cfg):
@@ -74,7 +70,6 @@ class DepthModel(nn.Module):
     def forward(self, x,e):
         inp = x #inp = e.repeat(1,3,1,1)#x*e.repeat(1,3,1,1)#torch.cat([x,e],dim = 1)
         lateral_out, encoder_stage_size = self.encoder_modules(inp) #x
-        #print(lateral_out[0].shape,lateral_out[1].shape,lateral_out[2].shape,lateral_out[3].shape,lateral_out[4].shape)
         out_logit, out_softmax = self.decoder_modules(lateral_out, encoder_stage_size)
         return out_logit, out_softmax
 

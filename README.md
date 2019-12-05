@@ -2,7 +2,7 @@
 This repo contains an implementation of Resnext baseline for depth estimation in Pytorch.
 
 ## Prerequisites
-Download [NYUV2 dataset]() and [pre-trained models]().
+Download [NYUV2 dataset](https://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html) and [pre-trained models]().
 Then follow the installation instruction below:
 
 ### Installation

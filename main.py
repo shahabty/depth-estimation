@@ -74,7 +74,7 @@ train_args = {
 
 writer = SummaryWriter(comment='code')
 
-def train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train_args,test_args):
+def train(model,data_loader_train,data_loader_test,optimizer,criterion_1,criterion_2,cfg,train_args,test_args):
     if train_args['load_ckpt'] is not None:
         load_ckpt(train_args,model)
     model.train()
@@ -82,17 +82,17 @@ def train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train
     for epoch in range(train_args['epoch']):
         print('epoch #: %d'%epoch)
         for i,data in tqdm(enumerate(data_loader_train)):
-            target = data['B_bins'].squeeze().long().to(cfg['device'])
+            #target = data['B_bins'].squeeze().long()#.to(cfg['device'])
             
-
             output,pred_depth = model.train_nyuv2(data)
             output_softmax = output['b_fake_softmax']
-            output_logit = output['b_fake_logit']
+            output_logit = output['b_fake_logit'].cpu()
+            
+#            weights = calc_weights(output_softmax.cpu(),target.clone().detach())
 
-#            weights = torch.mean(torch.exp(-1*torch.pow((pred_depth - target.float()),2)))#*output_softmax )
-            #print(pred_depth.shape)          
-            #print(weights.shape)
-            loss = criterion(output_softmax,target)
+            loss_1 = criterion_1(output_logit,data['B_bins'].squeeze().long())
+            loss_2 = criterion_2(imgrad_yx(pred_depth.cpu()),data['E'].cpu())
+            loss = loss_1 + loss_2
             loss.backward()
             optimizer.zero_grad()
             optimizer.step()
@@ -108,7 +108,7 @@ def train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train
                 writer.add_image('Predicted_Depth',Estimated_depth,i + epoch*len(data_loader_train))
                 writer.add_image('Edge',Edge,i + epoch*len(data_loader_train))
                 writer.add_image('inputs',inputs,i + epoch*len(data_loader_train))
-            del target,output,pred_depth,loss
+            del output['b_fake_softmax'],output_softmax,output['b_fake_logit'],output_logit,pred_depth,loss
         print(lr)
 
         test(model,data_loader_test,cfg,test_args)
@@ -161,6 +161,34 @@ def test(model,data_loader,cfg,test_args):
 #    torch.mean(torch.exp(-1*torch.pow((output_logit[:,target,:,:]),2))*output_softmax )
 
 
+def imgrad(img):
+    img = torch.mean(img, 1, True)
+    fx = np.array([[1,0,-1],[2,0,-2],[1,0,-1]])
+    conv1 = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=False)
+    weight = torch.from_numpy(fx).float().unsqueeze(0).unsqueeze(0)
+    if img.is_cuda:
+        weight = weight.cuda()
+    conv1.weight = nn.Parameter(weight)
+    grad_x = conv1(img)
+
+    fy = np.array([[1,2,1],[0,0,0],[-1,-2,-1]])
+    conv2 = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=False)
+    weight = torch.from_numpy(fy).float().unsqueeze(0).unsqueeze(0)
+    if img.is_cuda:
+        weight = weight.cuda()
+    conv2.weight = nn.Parameter(weight)
+    grad_y = conv2(img)
+
+#     grad = torch.sqrt(torch.pow(grad_x,2) + torch.pow(grad_y,2))
+    
+    return grad_y, grad_x
+
+def imgrad_yx(img):
+    N,C,H,W = img.size()
+    grad_y, grad_x = imgrad(img)
+    return (grad_y**2 + grad_x**2).sqrt().squeeze()#(grad_y.view(N,C,-1) + grad_x.view(N,C,-1)).reshape(N,C,)#torch.cat((grad_y.view(N,C,-1), grad_x.view(N,C,-1)), dim=1)
+
+
 def poly_lr_scheduler(optimizer, init_lr, iter, lr_decay_iter=0.9,
                       max_iter=14500, power=0.9):
     """Polynomial decay of learning rate
@@ -171,8 +199,8 @@ def poly_lr_scheduler(optimizer, init_lr, iter, lr_decay_iter=0.9,
         :param power is a polymomial power
 
     """
-    if iter % lr_decay_iter or iter > max_iter:
-        return optimizer
+#    if iter % lr_decay_iter or iter > max_iter:
+#        return optimizer
 
     lr = init_lr*(1 - iter/max_iter)**power
     for param_group in optimizer.param_groups:
@@ -206,10 +234,11 @@ def main(cfg,train_args,test_args):
     model = MetricDepthModel(cfg).to(cfg['device']) 
     if cfg['mode'] == 'train':
         optimizer = optim.SGD(model.parameters(), lr=train_args['lr'], momentum=0.9, weight_decay = 0.0005)
-        criterion = nn.CrossEntropyLoss(weight=None, ignore_index = 151,reduction='elementwise_mean').to(cfg['device'])
+        criterion_1 = nn.CrossEntropyLoss(weight=None, ignore_index = 151,reduction='elementwise_mean').to(cfg['device'])
+        criterion_2 = nn.MSELoss()
         data_loader_train = CustomerDataLoader(cfg,train_args)
         data_loader_test = CustomerDataLoader(cfg,test_args)
-        train(model,data_loader_train,data_loader_test,optimizer,criterion,cfg,train_args,test_args)
+        train(model,data_loader_train,data_loader_test,optimizer,criterion_1,criterion_2,cfg,train_args,test_args)
 
     if cfg['mode'] == 'test':
         data_loader = CustomerDataLoader(cfg,test_args)

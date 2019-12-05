@@ -1,10 +1,19 @@
 import os
 import torch
 import cv2
-#from lib.core.config import cfg
 import numpy as np
 import torch.nn.functional as F
+from torch.autograd import Variable
 import dill
+
+
+#def calc_weights(output,labels,num_classes = 152):
+#    labels.unsqueeze_(1)
+#    one_hot = torch.FloatTensor(labels.size(0), num_classes, labels.size(2), labels.size(3)).zero_()
+#    target = one_hot.scatter_(1, labels.data, 1)
+#    target = target[:,:150,:,:]
+#    o = torch.exp(-1*torch.pow((output - target),2)).mean(-1).mean(-1)
+#    return o
 
 def bins_to_depth(cfg,depth_bin):
     """
@@ -75,7 +84,7 @@ def load_ckpt(args, model, optimizer=None, scheduler=None, val_err=[]):
 
 def save_ckpt(batchsize,save_dir, step, epoch, model, optimizer):#, scheduler, val_err={}):
     """Save checkpoint"""
-    ckpt_dir = os.path.join(save_dir, 'ckpt')
+    ckpt_dir = os.path.join(save_dir, 'ckpt-edge-loss')
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
     save_name = os.path.join(ckpt_dir, 'epoch%d_step%d.pth' %(epoch, step))

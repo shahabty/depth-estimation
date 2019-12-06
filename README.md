@@ -18,4 +18,4 @@ username@PC:~$ conda activate mde
 
 
 ## Acknowledgments
-This implementation is based on official implementation of [Enforcing geometric constraints of virtual normal for depth prediction.](https://github.com/YvanYin/VNL_Monocular_Depth_Prediction).
+This implementation is partially based on official implementation of [Enforcing geometric constraints of virtual normal for depth prediction.](https://github.com/YvanYin/VNL_Monocular_Depth_Prediction).

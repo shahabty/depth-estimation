@@ -75,8 +75,10 @@ def load_ckpt(args, model, optimizer=None, scheduler=None, val_err=[]):
             args['batchsize'] = checkpoint['batch_size']
             args['start_step'] = checkpoint['step']
             args['start_epoch'] = checkpoint['epoch']
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            scheduler.load_state_dict(checkpoint['scheduler'])
+            if optimizer is not None:
+                optimizer.load_state_dict(checkpoint['optimizer'])
+            if scheduler is not None:
+                scheduler.load_state_dict(checkpoint['scheduler'])
             if 'val_err' in checkpoint:  # For backward compatibility
                 val_err[0] = checkpoint['val_err']
         del checkpoint
@@ -88,14 +90,10 @@ def save_ckpt(batchsize,save_dir, step, epoch, model, optimizer):#, scheduler, v
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
     save_name = os.path.join(ckpt_dir, 'epoch%d_step%d.pth' %(epoch, step))
-    #if isinstance(model, nn.DataParallel):
-    #    model = model.module
     torch.save({
         'step': step,
         'epoch': epoch,
         'batch_size': batchsize,
-        #'scheduler': scheduler.state_dict(),
-        #'val_err': val_err,
         'model_state_dict': model.state_dict(),
         'optimizer': optimizer.state_dict()},
         save_name, pickle_module=dill)

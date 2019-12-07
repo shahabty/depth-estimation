@@ -14,7 +14,7 @@ from load_dataset import CustomerDataLoader
 from utils import load_ckpt,save_ckpt,resize_image
 from evaluate import evaluate_err
 cfg = {
-'mode': 'train',
+'mode': 'test',
 'device': 'cuda:0',
 'RESNET_BOTTLENECK_DIM':[64, 256, 512, 1024, 2048],
 'LATERAL_OUT':[512, 256, 256, 256],
@@ -50,7 +50,7 @@ test_args = {
 'batchsize':1,
 'dataset':'nyudv2',
 'dataroot':'NYUDV2',
-'load_ckpt':None,
+'load_ckpt':'ckpt-edge-loss/epoch17_step13713.pth',#epoch12_step9738.pth',
 'start_step':0,
 'start_epoch':0,
 'save_dir':'',
@@ -91,7 +91,7 @@ def train(model,data_loader_train,data_loader_test,optimizer,criterion_1,criteri
 #            weights = calc_weights(output_softmax.cpu(),target.clone().detach())
 
             loss_1 = criterion_1(output_logit,data['B_bins'].squeeze().long())
-            loss_2 = criterion_2(imgrad_yx(pred_depth.cpu()),data['E'].cpu())
+            loss_2 = criterion_2(imgrad_yx(pred_depth.cpu().clone()),data['E'].cpu())
             loss = loss_1 + loss_2
             loss.backward()
             optimizer.zero_grad()
@@ -115,8 +115,8 @@ def train(model,data_loader_train,data_loader_test,optimizer,criterion_1,criteri
         save_ckpt(train_args['batchsize'],save_dir = '.',step = i + epoch*len(data_loader_train),epoch = epoch,model = model,optimizer = optimizer)
 
 def test(model,data_loader,cfg,test_args):
-#    if test_args['load_ckpt'] is not None:
-#        load_ckpt(test_args,model)
+    if test_args['load_ckpt'] is not None:
+        load_ckpt(test_args,model)
     model.eval()
     error_total = {'err_absRel': 0.0, 'err_squaRel': 0.0, 'err_rms': 0.0,
                          'err_silog': 0.0, 'err_logRms': 0.0, 'err_silog2': 0.0,
@@ -132,6 +132,17 @@ def test(model,data_loader,cfg,test_args):
         pred_depth = pred_depth[invalid_side[0]:pred_depth.size(0) - invalid_side[1], :]
         pred_depth = pred_depth / data['ratio'].to(cfg['device']) # scale the depth
         pred_depth = resize_image(pred_depth, torch.squeeze(data['B_raw']).shape)
+
+        if i % 10 == 0:
+            Img = vutils.make_grid(data['A'].data.cpu(),normalize = True,scale_each = True)
+            GT_depth = vutils.make_grid(data['B_raw'].data.cpu(),normalize = True,scale_each = True)
+            Estimated_depth = vutils.make_grid(torch.from_numpy(pred_depth),normalize = True,scale_each = True)
+            Edge = vutils.make_grid(data['E'].unsqueeze(1).repeat(1,3,1,1).data.cpu(),normalize = True,scale_each = True)
+            writer.add_image('RGB',Img,i)
+            writer.add_image('GT_Depth',GT_depth,i)
+            writer.add_image('Predicted_Depth',Estimated_depth,i)
+            writer.add_image('Edge',Edge,i)
+
         error_batch,n_pxl,eval_num = evaluate_err(pred_depth, data['B_raw'], mask=(45, 471, 41, 601), scale=10.)
         for (k1,v1), (k2,v2) in zip(error_total.items(), error_batch.items()):
             error_total[k1] += error_batch[k2]
